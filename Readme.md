@@ -78,6 +78,143 @@ This system provides **real-time credit risk assessment** by analyzing a combina
   
 The system will combine **John’s crypto transaction history**, **social media sentiment**, and **utility payment history** to predict his **creditworthiness**. It will flag any unusual crypto transactions or social media posts as **suspicious**, raising a fraud alert in real time.
 
+## CODE
+
+### Data collection
+```
+import requests
+import pandas as pd
+
+def fetch_crypto_data(wallet_address):
+    """Fetch crypto wallet balance and transaction count."""
+    api_key = "YourAPIKey"  # Replace with your API key
+    base_url = "https://api.etherscan.io/api"
+    
+    # Wallet balance
+    balance_url = f"{base_url}?module=account&action=balance&address={wallet_address}&apikey={api_key}"
+    balance_response = requests.get(balance_url)
+    balance = int(balance_response.json()["result"]) / 1e18  # Convert Wei to ETH
+    
+    # Transaction count
+    tx_url = f"{base_url}?module=account&action=txlist&address={wallet_address}&apikey={api_key}"
+    tx_response = requests.get(tx_url)
+    transactions = tx_response.json()["result"]
+    transaction_count = len(transactions)
+    
+    return balance, transaction_count
+
+# Example: Fetch crypto data for wallets
+wallet_addresses = ["0xSampleWallet1", "0xSampleWallet2"]
+crypto_data = [fetch_crypto_data(wallet) for wallet in wallet_addresses]
+df_crypto = pd.DataFrame(crypto_data, columns=["crypto_wallet_balance", "crypto_transaction_count"])
+
+```
+### Combine Traditional and Alternative Data
+```
+# Traditional financial data
+df_traditional = pd.DataFrame({
+    "user_id": [1, 2],
+    "credit_score": [720, 580],
+    "income": [6000, 3000],
+    "utility_payment_consistency": [1.0, 0.6],
+})
+
+# Combine datasets
+df_combined = pd.concat([df_traditional, df_crypto], axis=1)
+print(df_combined)
+
+```
+
+### Feature Engineering
+
+```
+df_combined["crypto_stability"] = df_combined["crypto_wallet_balance"] / (df_combined["crypto_transaction_count"] + 1)
+df_combined["income_to_balance_ratio"] = df_combined["income"] / (df_combined["crypto_wallet_balance"] + 1)
+```
+
+### Model
+
+```
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+
+# Target variable
+df_combined["default_risk"] = [0, 1]  # 0 = No Default, 1 = Default
+
+# Split data
+X = df_combined[["credit_score", "income", "utility_payment_consistency", 
+                 "crypto_wallet_balance", "crypto_transaction_count", 
+                 "crypto_stability", "income_to_balance_ratio"]]
+y = df_combined["default_risk"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
+
+# Train Random Forest Classifier
+model = RandomForestClassifier(random_state=42)
+model.fit(X_train, y_train)
+
+# Evaluate the model
+y_pred = model.predict(X_test)
+print(classification_report(y_test, y_pred))
+```
+### Explainable AI
+```
+import shap
+
+# SHAP Explainer
+explainer = shap.Explainer(model, X_test)
+shap_values = explainer(X_test)
+
+# Visualize feature importance
+shap.summary_plot(shap_values, X_test, plot_type="bar")
+
+# Explain a single prediction
+shap.plots.waterfall(shap_values[0])
+```
+### Risk assesment
+```
+def real_time_risk(wallet_address, model):
+    """Calculate real-time credit risk for a new wallet."""
+    balance, tx_count = fetch_crypto_data(wallet_address)
+    new_data = pd.DataFrame([{
+        "credit_score": 700,  # Example default value
+        "income": 5000,       # Example default value
+        "utility_payment_consistency": 1.0,
+        "crypto_wallet_balance": balance,
+        "crypto_transaction_count": tx_count,
+        "crypto_stability": balance / (tx_count + 1),
+        "income_to_balance_ratio": 5000 / (balance + 1),
+    }])
+    risk_score = model.predict_proba(new_data)[0][1]
+    return risk_score
+
+# Example usage
+new_wallet = "0xSampleWallet1"
+risk_score = real_time_risk(new_wallet, model)
+print(f"Real-Time Credit Risk Score: {risk_score:.2f}")
+
+```
+
+### Dashboard
+```
+import streamlit as st
+
+st.title("Crypto-Enhanced Credit Risk Assessment")
+
+# Show data
+st.dataframe(df_combined)
+
+# User input for wallet
+wallet_address = st.text_input("Enter Wallet Address:", "0xSampleWallet1")
+if st.button("Assess Risk"):
+    score = real_time_risk(wallet_address, model)
+    st.write(f"Real-Time Credit Risk Score: {score:.2f}")
+
+# SHAP visualizations
+st.header("Feature Importance")
+st.pyplot(shap.summary_plot(shap_values, X_test, plot_type="bar", show=False))
+```
 ### Conclusion
 This Real-Time Credit Risk Assessment System integrates a range of data sources—traditional financial data, alternative data, and cryptocurrency activity—to provide a comprehensive and dynamic approach to credit scoring. By incorporating blockchain insights and behavioral data from decentralized finance, the system offers a deeper, more inclusive understanding of an individual's financial health, especially for those who may not have a conventional credit history.
 
